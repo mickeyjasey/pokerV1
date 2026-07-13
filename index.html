@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>德州扑克 Heads-Up 面对面完全体 V2</title>
+    <title>德州扑克 Heads-Up 面对面完全体 V3</title>
     <style>
         :root {
             --felt-color: #1b4d3e; --felt-dark: #11362a;
@@ -17,7 +17,6 @@
             display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-user-select: none;
         }
 
-        /* 初始配置面板 */
         #setup-panel { position: absolute; inset: 0; background: #1e1e24; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow-y: auto; }
         .setup-box { background: #2c2c35; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); width: 85%; max-width: 350px; text-align: center; }
         .input-group { margin: 12px 0; text-align: left; }
@@ -26,7 +25,6 @@
         .checkbox-group { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin-top: 15px; font-size: 16px; color: #f1c40f; font-weight: bold;}
         .checkbox-group input { width: 20px; height: 20px; accent-color: #27ae60; }
 
-        /* 主游戏视窗 */
         #game-container { display: none; height: 100%; width: 100%; flex-direction: column; background: var(--felt-color); box-shadow: inset 0 0 100px rgba(0,0,0,0.8); }
 
         .player-half { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: space-evenly; border: 3px solid transparent; transition: all 0.4s ease; padding: 5px 10px; box-sizing: border-box; position: relative; }
@@ -44,19 +42,17 @@
         button { flex: 1; padding: 10px 0; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; color: white; cursor: pointer; transition: 0.1s; background: #34495e; }
         button:active { transform: scale(0.96); }
         button:disabled { opacity: 0.4; cursor: not-allowed; }
-        .btn-fold { background: #c0392b; } .btn-call { background: #2980b9; } .btn-raise-confirm { background: #27ae60; font-size: 16px; flex: 2; box-shadow: 0 0 10px rgba(39, 174, 96, 0.5);} .btn-pct { background: #555; flex: 1; padding: 8px 0; font-size: 12px; }
+        .btn-fold { background: #c0392b; } .btn-call { background: #2980b9; } .btn-raise-confirm { background: #27ae60; font-size: 16px; flex: 2; box-shadow: 0 0 10px rgba(39, 174, 96, 0.5);} .btn-pct { background: #555; flex: 1; padding: 8px 0; font-size: 13px; font-weight: bold;}
 
         .slider-container { display: flex; align-items: center; gap: 10px; background: #111; padding: 5px 10px; border-radius: 8px; }
         input[type=range] { flex: 1; height: 6px; background: #555; border-radius: 3px; outline: none; -webkit-appearance: none; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; background: #f1c40f; border-radius: 50%; cursor: pointer; }
-        .slider-val { min-width: 50px; text-align: right; font-weight: bold; color: #f1c40f; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 22px; height: 22px; background: #f1c40f; border-radius: 50%; cursor: pointer; box-shadow: 0 0 5px #000; }
+        .slider-val { min-width: 50px; text-align: right; font-weight: bold; color: #f1c40f; font-size: 16px;}
 
-        /* 双向同步气泡与筹码区域 */
         .bet-area { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60px; margin: 2px 0;}
         .bet-chip { background: radial-gradient(circle, #f1c40f 30%, #d35400 100%); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); font-weight: 900; border-radius: 50%; width: 40px; height: 40px; display: none; align-items: center; justify-content: center; border: 3px dashed #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.6); font-size: 13px; z-index: 2;}
         .action-bubble { background: #3498db; color: white; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; margin-bottom: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s; z-index: 1;}
 
-        /* 无遮挡中央公共区域 */
         #center-board { flex: 0 0 130px; background: var(--felt-dark); display: flex; flex-direction: column; align-items: center; justify-content: space-between; position: relative; z-index: 5; padding: 10px 0;}
         .pot-display { font-size: 15px; color: #f1c40f; font-weight: 900; text-shadow: 0 2px 5px rgba(0,0,0,0.8); background: rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 10px;}
         .pot-p1 { transform: rotate(180deg); }
@@ -71,15 +67,12 @@
         .card .card-suit { font-size: 12px; }
         .card .center-suit { font-size: 32px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.2; }
 
-        /* 全新侧边结算战报 (完全避开公共牌) */
         .sd-report { display: none; width: 90%; max-width: 400px; background: rgba(0,0,0,0.85); padding: 12px; border-radius: 12px; border: 1px solid #f1c40f; box-shadow: 0 0 15px rgba(241, 196, 15, 0.4); flex-direction: column; align-items: center; gap: 8px; z-index: 20; backdrop-filter: blur(4px);}
         .sd-report-title { color: #f1c40f; font-size: 18px; font-weight: bold; border-bottom: 1px solid #555; padding-bottom: 4px; width: 100%; text-align: center;}
         .sd-players-grid { display: flex; justify-content: space-around; width: 100%; }
         .sd-player-col { display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .sd-p-name { font-size: 12px; color: #bdc3c7; font-weight: bold;}
         .sd-p-hand { font-size: 14px; color: #fff; font-weight: bold;}
-        
-        /* 迷你底牌样式 */
         .mini-cards-box { display: flex; gap: 2px; }
         .m-card { background: #fff; width: 22px; height: 32px; border-radius: 3px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; box-shadow: 0 2px 4px rgba(0,0,0,0.5);}
 
@@ -88,7 +81,6 @@
 </head>
 <body>
 
-    <!-- 初始代入与设置 -->
     <div id="setup-panel">
         <div class="setup-box">
             <h2 style="color:#f1c40f; margin-top:0;">德州对战配置</h2>
@@ -116,10 +108,9 @@
         </div>
     </div>
 
-    <!-- 核心游戏区 -->
     <div id="game-container">
         
-        <!-- ================= 玩家 2 区域 (上半屏 旋转180度) ================= -->
+        <!-- ================= 玩家 2 区域 ================= -->
         <div id="half-1" class="player-half top-half">
             <div class="player-info">
                 <div class="name-dealer"><span id="dealer-1"></span> <span id="name-display-1">玩家 2</span></div>
@@ -131,13 +122,11 @@
                 <div id="card-1-1" class="card back" onclick="toggleCard(1, 1)"></div>
             </div>
 
-            <!-- 同步气泡与筹码 -->
             <div class="bet-area">
                 <div class="action-bubble" id="action-1">等待操作</div>
                 <div class="bet-chip" id="chip-1">$0</div>
             </div>
 
-            <!-- 战报模块 -->
             <div class="sd-report" id="sd-report-1"></div>
 
             <div class="action-console" id="console-1">
@@ -146,10 +135,9 @@
                     <button class="btn-call" id="btn-call-1" onclick="handleAction('call')">看牌/跟注</button>
                 </div>
                 <div class="row">
-                    <button class="btn-pct" onclick="setSliderByPct(0.25, 1)">25%</button>
                     <button class="btn-pct" onclick="setSliderByPct(0.5, 1)">50%</button>
-                    <button class="btn-pct" onclick="setSliderByPct(0.75, 1)">75%</button>
                     <button class="btn-pct" onclick="setSliderByPct(1, 1)">100%</button>
+                    <button class="btn-pct" onclick="setSliderByPct(2, 1)">200%</button>
                     <button class="btn-pct" onclick="setSliderMax(1)" style="background:#e74c3c;">All-in</button>
                 </div>
                 <div class="row slider-container">
@@ -160,7 +148,7 @@
             </div>
         </div>
 
-        <!-- ================= 中央公共牌及底池区域 ================= -->
+        <!-- ================= 中央区域 ================= -->
         <div id="center-board">
             <div class="pot-display pot-p1" id="main-pot-1">总底池: $0</div>
             <div id="board-cards">
@@ -170,25 +158,21 @@
                 <div class="card back" style="visibility: hidden;"></div>
                 <div class="card back" style="visibility: hidden;"></div>
             </div>
-            
             <button id="btn-next-hand" onclick="startNextHand()">下一局</button>
-
             <div class="pot-display" id="main-pot-0">总底池: $0</div>
         </div>
 
-        <!-- ================= 玩家 1 区域 (下半屏 正向) ================= -->
+        <!-- ================= 玩家 1 区域 ================= -->
         <div id="half-0" class="player-half bottom-half">
-            
             <div class="action-console" id="console-0">
                 <div class="row">
                     <button class="btn-fold" onclick="handleAction('fold')">弃牌</button>
                     <button class="btn-call" id="btn-call-0" onclick="handleAction('call')">看牌/跟注</button>
                 </div>
                 <div class="row">
-                    <button class="btn-pct" onclick="setSliderByPct(0.25, 0)">25%</button>
                     <button class="btn-pct" onclick="setSliderByPct(0.5, 0)">50%</button>
-                    <button class="btn-pct" onclick="setSliderByPct(0.75, 0)">75%</button>
                     <button class="btn-pct" onclick="setSliderByPct(1, 0)">100%</button>
+                    <button class="btn-pct" onclick="setSliderByPct(2, 0)">200%</button>
                     <button class="btn-pct" onclick="setSliderMax(0)" style="background:#e74c3c;">All-in</button>
                 </div>
                 <div class="row slider-container">
@@ -198,10 +182,8 @@
                 <button class="btn-raise-confirm" id="btn-confirm-0" onclick="handleAction('raise')">确认加注到 $0</button>
             </div>
 
-            <!-- 战报模块 -->
             <div class="sd-report" id="sd-report-0"></div>
 
-            <!-- 同步气泡与筹码 -->
             <div class="bet-area">
                 <div class="action-bubble" id="action-0">等待操作</div>
                 <div class="bet-chip" id="chip-0">$0</div>
@@ -234,7 +216,6 @@
     let actionCount = 0, isHandActive = false;
     let pendingRaiseAmount = 0;
 
-    // AI语音合成
     function speakText(text) {
         if (!enableVoice) return;
         window.speechSynthesis.cancel();
@@ -243,7 +224,6 @@
         window.speechSynthesis.speak(msg);
     }
 
-    // 核心改进 01：双边同步显示主语动作气泡
     function broadcastAction(actorName, actionText, color = "#3498db") {
         let fullMsg = `${actorName}：${actionText}`;
         [0, 1].forEach(i => {
@@ -361,15 +341,28 @@
         document.getElementById(`btn-confirm-${pIdx}`).innerText = `确认加注到 $${pendingRaiseAmount}`;
     }
 
+    // 核心改进 01：更符合直觉的真实加注逻辑 & 强制对齐 BB 步长
     function setSliderByPct(pct, pIdx) {
-        let me = players[pIdx]; let callCost = highestBet - me.bet;
-        let virtualPot = mainPot + players[0].bet + players[1].bet + callCost;
-        let targetTotal = highestBet + Math.floor(virtualPot * pct);
+        let currentLivePot = mainPot + players[0].bet + players[1].bet;
+        // 目标下注额 = 当前最高注 + (底池 * 比例)
+        let targetTotal = highestBet + Math.floor(currentLivePot * pct);
+        
+        // 强制吸附运算，使得每次加出来的注都是盲注的整数倍，手感更干脆
+        let remainder = targetTotal % bbValue;
+        if (remainder !== 0) {
+            targetTotal = targetTotal - remainder + (remainder >= (bbValue / 2) ? bbValue : 0);
+        }
+
         let slider = document.getElementById(`slider-${pIdx}`);
         let min = parseInt(slider.min), max = parseInt(slider.max);
-        if(targetTotal < min) targetTotal = min; if(targetTotal > max) targetTotal = max;
-        slider.value = targetTotal; updatePendingRaise(targetTotal, pIdx);
+        
+        if(targetTotal < min) targetTotal = min; 
+        if(targetTotal > max) targetTotal = max;
+        
+        slider.value = targetTotal; 
+        updatePendingRaise(targetTotal, pIdx);
     }
+    
     function setSliderMax(pIdx) { let s = document.getElementById(`slider-${pIdx}`); s.value = s.max; updatePendingRaise(s.max, pIdx); }
 
     function handleAction(act) {
@@ -448,7 +441,6 @@
         updateUI();
     }
 
-    // 生成战报里的迷你底牌 HTML
     function getMiniCardsHTML(pIdx) {
         let c0 = players[pIdx].cards[0];
         let c1 = players[pIdx].cards[1];
@@ -459,10 +451,8 @@
             </div>`;
     }
 
-    // 核心改进 02：无遮挡战报 & 双底牌清晰展示
     function showdown() {
         isHandActive = false;
-        // 桌面大牌强制翻开
         for (let p = 0; p < 2; p++) { players[p].revealed = [false, false]; toggleCard(p, 0); toggleCard(p, 1); }
         let s0 = getBest5(players[0].cards.concat(board));
         let s1 = getBest5(players[1].cards.concat(board));
@@ -486,7 +476,6 @@
             voiceText += `双方平分底池。`;
         }
         
-        // 构建带迷你底牌的战报网格
         let sharedGrid = `
             <div class="sd-players-grid">
                 <div class="sd-player-col">
@@ -512,7 +501,6 @@
         mainPot = 0; updateUI();
     }
     
-    // 如果一方弃牌，简化战报
     function endHand(winnerInfo, amount, loserInfo) { 
         isHandActive = false; mainPot = 0; updateUI(); 
         let html = `<div class="sd-report-title"><span style="color:#2ecc71;">🏆 赢取 $${amount}</span></div>
@@ -564,6 +552,8 @@
             
             let slider = document.getElementById(`slider-${toAct}`);
             slider.min = minTarget; slider.max = maxTarget;
+            // 核心改进 02：强制滑块以大盲注 (BB) 为步长进行滑动
+            slider.step = bbValue;
             
             let disableRaise = (me.stack <= callCost);
             slider.disabled = disableRaise;
