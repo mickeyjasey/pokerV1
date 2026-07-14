@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>德州扑克 Heads-Up 面对面终极完美版 V4</title>
+    <title>德州扑克 Heads-Up 面对面终极完美版 V5</title>
     <style>
         :root { --felt-color: #1b4d3e; --felt-dark: #11362a; --gold-active: rgba(255, 215, 0, 0.8); --gold-bg: rgba(255, 215, 0, 0.15); --card-back: #c0392b; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: #000; color: #f5f5f7; margin: 0; padding: 0; height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-user-select: none; }
@@ -134,7 +134,7 @@
                     <input type="range" id="slider-1" oninput="updatePendingRaise(this.value, 1)">
                     <div class="slider-val" id="slider-val-1">$0</div>
                 </div>
-                <button class="btn-raise-confirm" id="btn-confirm-1" onclick="handleAction('raise')">确认加注到 $0</button>
+                <button class="btn-raise-confirm" id="btn-confirm-1" onclick="handleAction('raise')">确认加注(bet)：$0</button>
             </div>
         </div>
 
@@ -167,7 +167,7 @@
                     <input type="range" id="slider-0" oninput="updatePendingRaise(this.value, 0)">
                     <div class="slider-val" id="slider-val-0">$0</div>
                 </div>
-                <button class="btn-raise-confirm" id="btn-confirm-0" onclick="handleAction('raise')">确认加注到 $0</button>
+                <button class="btn-raise-confirm" id="btn-confirm-0" onclick="handleAction('raise')">确认加注(bet)：$0</button>
             </div>
 
             <div class="sd-report" id="sd-report-0"></div>
@@ -225,13 +225,10 @@
         document.getElementById('action-1').style.opacity = 0;
     }
 
-    // 完美修正算法缺陷：采用浮点乘法彻底消除模偏差(Modulo Bias)
     function secureShuffle(arr) {
         if (window.crypto && window.crypto.getRandomValues) {
             const rVals = new Uint32Array(arr.length); window.crypto.getRandomValues(rVals);
             for (let i = arr.length - 1; i > 0; i--) {
-                // 原代码：const j = rVals[i] % (i + 1);
-                // 完美代码：(rVals / 4294967296) 得到一个极高精度的 0~0.999 随机小数
                 const j = Math.floor((rVals[i] / 4294967296) * (i + 1));
                 [arr[i], arr[j]] = [arr[j], arr[i]];
             }
@@ -325,7 +322,8 @@
     function updatePendingRaise(val, pIdx) {
         pendingRaiseAmount = parseInt(val);
         document.getElementById(`slider-val-${pIdx}`).innerText = `$${pendingRaiseAmount}`;
-        document.getElementById(`btn-confirm-${pIdx}`).innerText = `确认加注到 $${pendingRaiseAmount}`;
+        // 核心更新 02：使用符合现实扑克的确认按钮文案
+        document.getElementById(`btn-confirm-${pIdx}`).innerText = `确认加注(bet)：$${pendingRaiseAmount}`;
     }
 
     function setSliderByPct(pct, pIdx) {
@@ -362,21 +360,28 @@
 
         if (act === 'call') {
             if (callCost === 0) {
-                broadcastAction(me.name, "看牌 (Check)", "#7f8c8d"); speakText(`${me.name} 看牌`);
+                broadcastAction(me.name, "看牌 (Check)", "#7f8c8d"); 
+                // 核心更新 03：纯正 Check 语音
+                speakText(`${me.name} check`);
             } else if (me.stack <= callCost) { 
-                broadcastAction(me.name, "全押跟注 (Call All-in)", "#e74c3c"); speakText(`${me.name} 全押跟注`);
+                broadcastAction(me.name, "全押跟注 (Call All-in)", "#e74c3c"); 
+                speakText(`${me.name} all in`);
                 me.bet += me.stack; me.stack = 0; me.allIn = true; 
             } else { 
-                broadcastAction(me.name, `跟注 $${callCost}`, "#2980b9"); speakText(`${me.name} 跟注`);
+                broadcastAction(me.name, `跟注 $${callCost}`, "#2980b9"); 
+                speakText(`${me.name} 跟注`);
                 me.stack -= callCost; me.bet += callCost; 
             }
         } else if (act === 'raise') {
             let target = pendingRaiseAmount; let needed = target - me.bet;
             if (needed >= me.stack) { 
-                broadcastAction(me.name, "全押 (All-in)", "#e74c3c"); speakText(`${me.name} 全押`);
+                broadcastAction(me.name, "全押 (All-in)", "#e74c3c"); 
+                speakText(`${me.name} all in`);
                 me.bet += me.stack; me.stack = 0; me.allIn = true; target = me.bet;
             } else { 
-                broadcastAction(me.name, `加注到 $${target}`, "#27ae60"); speakText(`${me.name} 加注到 ${target}`);
+                broadcastAction(me.name, `加注(bet)：$${target}`, "#27ae60"); 
+                // 核心更新 03：纯正 Bet 语音
+                speakText(`${me.name} bet ${target}`);
                 me.stack -= needed; me.bet = target; 
             }
             if (target > highestBet) { minRaiseInc = Math.max(minRaiseInc, target - highestBet); highestBet = target; }
@@ -396,16 +401,12 @@
         else { toAct = 1 - toAct; updateUI(); }
     }
 
-    // 完美修正逻辑漏洞：进街或All-in结算前，强制退回多余未跟注筹码
     function advanceStreet() {
         clearActionBubbles();
         
         let diff = players[0].bet - players[1].bet;
-        if (diff > 0) {
-            players[0].stack += diff; players[0].bet -= diff;
-        } else if (diff < 0) {
-            players[1].stack += Math.abs(diff); players[1].bet -= Math.abs(diff);
-        }
+        if (diff > 0) { players[0].stack += diff; players[0].bet -= diff; } 
+        else if (diff < 0) { players[1].stack += Math.abs(diff); players[1].bet -= Math.abs(diff); }
 
         mainPot += players[0].bet + players[1].bet;
         players[0].bet = 0; players[1].bet = 0;
@@ -434,7 +435,7 @@
                 </div>`;
     }
 
-    // 完美修正计算瑕疵：平分底池不丢失零头
+    // 核心更新 01：完全非对称的战报显示引擎 (赢家看赢，输家看输)
     function showdown() {
         isHandActive = false;
         for (let p = 0; p < 2; p++) { players[p].revealed = [false, false]; toggleCard(p, 0); toggleCard(p, 1); }
@@ -445,17 +446,18 @@
 
         if (s0.score > s1.score) { 
             players[0].stack += mainPot; 
-            res0 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`; res1 = `<span style="color:#e74c3c;">💀 输掉底池</span>`;
-            voiceText += `${players[0].name} 的 ${s0.name} 胜出。`;
+            res0 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`; 
+            res1 = `<span style="color:#e74c3c;">💀 输掉 $${mainPot}</span>`;
+            voiceText += `${players[0].name} 胜出。`;
         } else if (s1.score > s0.score) { 
             players[1].stack += mainPot; 
-            res1 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`; res0 = `<span style="color:#e74c3c;">💀 输掉底池</span>`;
-            voiceText += `${players[1].name} 的 ${s1.name} 胜出。`;
+            res1 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`; 
+            res0 = `<span style="color:#e74c3c;">💀 输掉 $${mainPot}</span>`;
+            voiceText += `${players[1].name} 胜出。`;
         } else { 
             let h = Math.floor(mainPot/2); 
-            let oddChip = mainPot % 2; // 获取无法平分的1块钱零头
-            players[0].stack += h + oddChip; // 零头补偿给玩家1
-            players[1].stack += h; 
+            let oddChip = mainPot % 2; 
+            players[0].stack += h + oddChip; players[1].stack += h; 
             res0 = `<span style="color:#3498db;">🤝 平分 $${h + oddChip}</span>`;
             res1 = `<span style="color:#3498db;">🤝 平分 $${h}</span>`;
             voiceText += `双方平分底池。`;
@@ -477,12 +479,24 @@
         speakText(voiceText); mainPot = 0; updateUI();
     }
     
+    // 核心更新 01：弃牌结算也做到双边非对称显示
     function endHand(winnerInfo, amount, loserInfo) { 
         isHandActive = false; mainPot = 0; updateUI(); 
-        let html = `<div class="sd-report-title"><span style="color:#2ecc71;">🏆 赢取 $${amount}</span></div>
-                    <div style="color:#bdc3c7; font-size: 14px; margin-top:5px;">${loserInfo.name} 已弃牌</div>`;
-        document.getElementById('sd-report-0').innerHTML = html; document.getElementById('sd-report-1').innerHTML = html;
-        document.getElementById('sd-report-0').style.display = 'flex'; document.getElementById('sd-report-1').style.display = 'flex';
+        let winHtml = `<div class="sd-report-title"><span style="color:#2ecc71;">🏆 赢取 $${amount}</span></div>
+                       <div style="color:#bdc3c7; font-size: 14px; margin-top:5px;">对手已弃牌</div>`;
+        let loseHtml = `<div class="sd-report-title"><span style="color:#e74c3c;">💀 输掉本局</span></div>
+                        <div style="color:#bdc3c7; font-size: 14px; margin-top:5px;">你已弃牌</div>`;
+
+        if (winnerInfo.id === 0) {
+            document.getElementById('sd-report-0').innerHTML = winHtml;
+            document.getElementById('sd-report-1').innerHTML = loseHtml;
+        } else {
+            document.getElementById('sd-report-0').innerHTML = loseHtml;
+            document.getElementById('sd-report-1').innerHTML = winHtml;
+        }
+
+        document.getElementById('sd-report-0').style.display = 'flex';
+        document.getElementById('sd-report-1').style.display = 'flex';
         document.getElementById('btn-next-hand').style.display = 'block';
     }
 
