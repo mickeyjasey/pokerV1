@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>德州扑克 Heads-Up 面对面终极完美版 V5</title>
+    <title>德州扑克 Heads-Up 面对面终极完美版 V7 (上头机制+范围惩罚)</title>
     <style>
         :root { --felt-color: #1b4d3e; --felt-dark: #11362a; --gold-active: rgba(255, 215, 0, 0.8); --gold-bg: rgba(255, 215, 0, 0.15); --card-back: #c0392b; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: #000; color: #f5f5f7; margin: 0; padding: 0; height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-user-select: none; }
@@ -24,7 +24,8 @@
         .active-half { border-color: var(--gold-active); background: radial-gradient(circle at center, var(--gold-bg) 0%, transparent 80%); box-shadow: inset 0 0 40px rgba(255, 215, 0, 0.2); }
 
         .player-info { display: flex; justify-content: space-between; align-items: center; width: 90%; max-width: 400px; background: rgba(0,0,0,0.6); padding: 8px 15px; border-radius: 20px; z-index: 5;}
-        .name-dealer { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 16px; color: #fff;}
+        .name-dealer { display: flex; align-items: center; gap: 8px; font-weight: bold; font-size: 16px; color: #fff; transition: color 0.3s;}
+        .name-dealer.tilted { color: #e74c3c; font-weight: 900; text-shadow: 0 0 5px rgba(231, 76, 60, 0.8); }
         .dealer-btn { background: #fff; color: #000; font-size: 11px; font-weight: 900; padding: 3px 6px; border-radius: 50%; }
         .stack-info { font-size: 15px; color: #f1c40f; font-weight: bold; }
 
@@ -42,7 +43,10 @@
 
         .bet-area { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 60px; margin: 2px 0;}
         .bet-chip { background: radial-gradient(circle, #f1c40f 30%, #d35400 100%); color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.8); font-weight: 900; border-radius: 50%; width: 40px; height: 40px; display: none; align-items: center; justify-content: center; border: 3px dashed #fff; box-shadow: 0 4px 10px rgba(0,0,0,0.6); font-size: 13px; z-index: 2;}
-        .action-bubble { background: #3498db; color: white; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; margin-bottom: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.3s; z-index: 1;}
+        .action-bubble { background: #3498db; color: white; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: bold; margin-bottom: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.5); opacity: 0; transition: all 0.3s; z-index: 1;}
+        .action-bubble.tilt-mode { background: #e74c3c; animation: shake 0.5s; }
+
+        @keyframes shake { 0% { transform: translateX(0); } 25% { transform: translateX(-3px); } 50% { transform: translateX(3px); } 75% { transform: translateX(-3px); } 100% { transform: translateX(0); } }
 
         #center-board { flex: 0 0 130px; background: var(--felt-dark); display: flex; flex-direction: column; align-items: center; justify-content: space-between; position: relative; z-index: 5; padding: 10px 0;}
         .pot-display { font-size: 15px; color: #f1c40f; font-weight: 900; text-shadow: 0 2px 5px rgba(0,0,0,0.8); background: rgba(0,0,0,0.5); padding: 2px 10px; border-radius: 10px;}
@@ -74,7 +78,7 @@
 
     <div id="setup-panel">
         <div class="setup-box">
-            <h2 style="color:#f1c40f; margin-top:0;">德州对战配置</h2>
+            <h2 style="color:#f1c40f; margin-top:0;">德州对战配置 (V7 终极版)</h2>
             <div class="input-group">
                 <label>上方玩家姓名 (Player 2)：</label>
                 <input type="text" id="input-name-1" value="玩家 2">
@@ -93,7 +97,11 @@
             </div>
             <div class="checkbox-group">
                 <input type="checkbox" id="toggle-voice" checked>
-                <label for="toggle-voice">开启 AI 语音播报互动</label>
+                <label for="toggle-voice">开启 AI 语音互动</label>
+            </div>
+            <div class="checkbox-group">
+                <input type="checkbox" id="toggle-ai" checked>
+                <label for="toggle-ai">P2 由 AI 接管 (带情绪机制)</label>
             </div>
             <button style="width:100%; background:#27ae60; font-size:18px; padding:12px; margin-top:15px; border-radius: 8px; color:white; font-weight:bold; border:none;" onclick="initGame()">进入牌桌</button>
         </div>
@@ -103,7 +111,7 @@
         
         <div id="half-1" class="player-half top-half">
             <div class="player-info">
-                <div class="name-dealer"><span id="dealer-1"></span> <span id="name-display-1">玩家 2</span></div>
+                <div class="name-dealer" id="name-box-1"><span id="dealer-1"></span> <span id="name-display-1">玩家 2</span></div>
                 <div class="stack-info">筹码: $<span id="stack-1">0</span></div>
             </div>
             
@@ -195,6 +203,17 @@
     const RANKS = [{val:2, l:'2'},{val:3, l:'3'},{val:4, l:'4'},{val:5, l:'5'},{val:6, l:'6'},{val:7, l:'7'},{val:8, l:'8'},{val:9, l:'9'},{val:10, l:'10'},{val:11, l:'J'},{val:12, l:'Q'},{val:13, l:'K'},{val:14, l:'A'}];
     const HAND_NAMES = ["高牌", "一对", "两对", "三条", "顺子", "同花", "葫芦", "四条", "同花顺"];
 
+    // AI 档案与状态 (V7新增上头机制)
+    const AI_PROFILES = [
+        { type: 'TAG', name: 'AI紧凶哥(TAG)', vpip: 0.30, aggr: 0.80, bluffRate: 0.30 },
+        { type: 'LAG', name: 'AI松凶狂人(LAG)', vpip: 0.60, aggr: 0.85, bluffRate: 0.60 },
+        { type: 'LP', name: 'AI跟注站(LP)', vpip: 0.80, aggr: 0.20, bluffRate: 0.05 },
+        { type: 'TP', name: 'AI老实人(TP)', vpip: 0.20, aggr: 0.30, bluffRate: 0.01 }
+    ];
+    let isP2AI = false;
+    let aiPersonality = null;
+    let aiTiltLevel = 0; // 情绪指数: 0冷静, >0上头
+
     let bbValue = 10;
     let enableVoice = true;
     let players = [{ id: 0, name: "玩家 1", stack: 0, bet: 0, cards: [], revealed: [false, false], folded: false, allIn: false },
@@ -212,12 +231,18 @@
         window.speechSynthesis.speak(msg);
     }
 
-    function broadcastAction(actorName, actionText, color = "#3498db") {
-        let fullMsg = `${actorName}：${actionText}`;
-        [0, 1].forEach(i => {
-            let bubble = document.getElementById(`action-${i}`);
-            bubble.innerText = fullMsg; bubble.style.background = color; bubble.style.opacity = 1;
-        });
+    function broadcastAction(actorId, actionText, color = "#3498db") {
+        let name = players[actorId].name;
+        let bubble = document.getElementById(`action-${actorId}`);
+        bubble.innerText = `${name}：${actionText}`; 
+        bubble.style.background = color; bubble.style.opacity = 1;
+        
+        // 如果AI上头，且是激进操作，加入震动特效
+        if (actorId === 1 && isP2AI && aiTiltLevel > 0 && (actionText.includes("加注") || actionText.includes("全押"))) {
+            bubble.classList.add('tilt-mode');
+        } else {
+            bubble.classList.remove('tilt-mode');
+        }
     }
     
     function clearActionBubbles() {
@@ -241,9 +266,18 @@
 
     function initGame() {
         players[0].name = document.getElementById('input-name-0').value || "玩家 1";
-        players[1].name = document.getElementById('input-name-1').value || "玩家 2";
+        
+        isP2AI = document.getElementById('toggle-ai').checked;
+        if (isP2AI) {
+            aiPersonality = AI_PROFILES[Math.floor(Math.random() * AI_PROFILES.length)];
+            players[1].name = aiPersonality.name; 
+            aiTiltLevel = 0;
+        } else {
+            players[1].name = document.getElementById('input-name-1').value || "玩家 2";
+        }
+        
         document.getElementById('name-display-0').innerText = players[0].name;
-        document.getElementById('name-display-1').innerText = players[1].name;
+        updateAINameDisplay();
         
         bbValue = parseInt(document.getElementById('input-bb').value) || 10;
         let startChips = bbValue * (parseInt(document.getElementById('input-buyin').value) || 100);
@@ -256,6 +290,18 @@
         document.getElementById('game-container').style.display = 'flex';
         btnIdx = 1; 
         startNextHand();
+    }
+    
+    function updateAINameDisplay() {
+        let nameDom = document.getElementById('name-display-1');
+        let boxDom = document.getElementById('name-box-1');
+        if (isP2AI && aiTiltLevel > 0) {
+            nameDom.innerText = players[1].name + " 😡";
+            boxDom.classList.add('tilted');
+        } else {
+            nameDom.innerText = players[1].name;
+            boxDom.classList.remove('tilted');
+        }
     }
 
     function getCardHTML(cardObj) {
@@ -271,8 +317,9 @@
         clearActionBubbles();
 
         if (players[0].stack <= 0 || players[1].stack <= 0) {
-            speakText("有玩家筹码输光，自动重置初始筹码");
+            speakText("筹码重新买入");
             players[0].stack = bbValue * 100; players[1].stack = bbValue * 100;
+            aiTiltLevel = 0; updateAINameDisplay(); // 破产重置情绪
         }
 
         for(let p=0; p<2; p++){
@@ -301,6 +348,10 @@
 
         speakText("新局开始");
         updateUI();
+        
+        if (isP2AI && toAct === 1 && isHandActive) {
+            setTimeout(processAITurn, 1000 + Math.random() * 1500);
+        }
     }
 
     function postBlind(pIdx, amt) {
@@ -311,6 +362,8 @@
 
     function toggleCard(pIdx, cIdx) {
         if(!isHandActive) return;
+        if(isP2AI && pIdx === 1) return; // 防偷看
+        
         let p = players[pIdx];
         p.revealed[cIdx] = !p.revealed[cIdx];
         let dom = document.getElementById(`card-${pIdx}-${cIdx}`);
@@ -322,14 +375,12 @@
     function updatePendingRaise(val, pIdx) {
         pendingRaiseAmount = parseInt(val);
         document.getElementById(`slider-val-${pIdx}`).innerText = `$${pendingRaiseAmount}`;
-        // 核心更新 02：使用符合现实扑克的确认按钮文案
-        document.getElementById(`btn-confirm-${pIdx}`).innerText = `确认加注(bet)：$${pendingRaiseAmount}`;
+        document.getElementById(`btn-confirm-${pIdx}`).innerText = `确认加注：$${pendingRaiseAmount}`;
     }
 
     function setSliderByPct(pct, pIdx) {
         let currentLivePot = mainPot + players[0].bet + players[1].bet;
         let targetTotal = highestBet + Math.floor(currentLivePot * pct);
-        
         let remainder = targetTotal % bbValue;
         if (remainder !== 0) { targetTotal = targetTotal - remainder + (remainder >= (bbValue / 2) ? bbValue : 0); }
 
@@ -350,7 +401,7 @@
         let callCost = highestBet - me.bet;
         
         if (act === 'fold') {
-            broadcastAction(me.name, "弃牌", "#c0392b");
+            broadcastAction(toAct, "弃牌", "#c0392b");
             speakText(`${me.name} 弃牌`);
             let uncalled = opp.bet - me.bet;
             if (uncalled > 0) { opp.stack += uncalled; opp.bet -= uncalled; }
@@ -360,27 +411,25 @@
 
         if (act === 'call') {
             if (callCost === 0) {
-                broadcastAction(me.name, "看牌 (Check)", "#7f8c8d"); 
-                // 核心更新 03：纯正 Check 语音
+                broadcastAction(toAct, "看牌 (Check)", "#7f8c8d"); 
                 speakText(`${me.name} check`);
             } else if (me.stack <= callCost) { 
-                broadcastAction(me.name, "全押跟注 (Call All-in)", "#e74c3c"); 
+                broadcastAction(toAct, "全押跟注 (Call All-in)", "#e74c3c"); 
                 speakText(`${me.name} all in`);
                 me.bet += me.stack; me.stack = 0; me.allIn = true; 
             } else { 
-                broadcastAction(me.name, `跟注 $${callCost}`, "#2980b9"); 
+                broadcastAction(toAct, `跟注 $${callCost}`, "#2980b9"); 
                 speakText(`${me.name} 跟注`);
                 me.stack -= callCost; me.bet += callCost; 
             }
         } else if (act === 'raise') {
             let target = pendingRaiseAmount; let needed = target - me.bet;
             if (needed >= me.stack) { 
-                broadcastAction(me.name, "全押 (All-in)", "#e74c3c"); 
+                broadcastAction(toAct, "全押 (All-in)", "#e74c3c"); 
                 speakText(`${me.name} all in`);
                 me.bet += me.stack; me.stack = 0; me.allIn = true; target = me.bet;
             } else { 
-                broadcastAction(me.name, `加注(bet)：$${target}`, "#27ae60"); 
-                // 核心更新 03：纯正 Bet 语音
+                broadcastAction(toAct, `加注(bet)：$${target}`, "#27ae60"); 
                 speakText(`${me.name} bet ${target}`);
                 me.stack -= needed; me.bet = target; 
             }
@@ -397,13 +446,20 @@
                 setTimeout(advanceStreet, 1000); return;
             }
         }
-        if (actionCount >= 2 && p0.bet === p1.bet) { setTimeout(advanceStreet, 800); } 
-        else { toAct = 1 - toAct; updateUI(); }
+        if (actionCount >= 2 && p0.bet === p1.bet) { 
+            setTimeout(advanceStreet, 800); 
+        } 
+        else { 
+            toAct = 1 - toAct; 
+            updateUI(); 
+            if (isP2AI && toAct === 1 && isHandActive) {
+                setTimeout(processAITurn, 1000 + Math.random() * 1500);
+            }
+        }
     }
 
     function advanceStreet() {
         clearActionBubbles();
-        
         let diff = players[0].bet - players[1].bet;
         if (diff > 0) { players[0].stack += diff; players[0].bet -= diff; } 
         else if (diff < 0) { players[1].stack += Math.abs(diff); players[1].bet -= Math.abs(diff); }
@@ -425,6 +481,9 @@
         else if (street === 4) { return showdown(); }
         
         updateUI();
+        if (isP2AI && toAct === 1 && isHandActive) {
+            setTimeout(processAITurn, 1000 + Math.random() * 1500);
+        }
     }
 
     function getMiniCardsHTML(pIdx) {
@@ -435,31 +494,39 @@
                 </div>`;
     }
 
-    // 核心更新 01：完全非对称的战报显示引擎 (赢家看赢，输家看输)
+    // 结合上头机制的摊牌结算
     function showdown() {
         isHandActive = false;
-        for (let p = 0; p < 2; p++) { players[p].revealed = [false, false]; toggleCard(p, 0); toggleCard(p, 1); }
+        for (let p = 0; p < 2; p++) { 
+            players[p].revealed = [true, true]; 
+            let dom0 = document.getElementById(`card-${p}-0`);
+            dom0.classList.remove('back'); dom0.innerHTML = getCardHTML(players[p].cards[0]); dom0.style.color = players[p].cards[0].color;
+            let dom1 = document.getElementById(`card-${p}-1`);
+            dom1.classList.remove('back'); dom1.innerHTML = getCardHTML(players[p].cards[1]); dom1.style.color = players[p].cards[1].color;
+        }
         let s0 = getBest5(players[0].cards.concat(board));
         let s1 = getBest5(players[1].cards.concat(board));
-
         let res0 = "", res1 = "", voiceText = "摊牌结算！";
 
         if (s0.score > s1.score) { 
             players[0].stack += mainPot; 
-            res0 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`; 
-            res1 = `<span style="color:#e74c3c;">💀 输掉 $${mainPot}</span>`;
+            res0 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`; res1 = `<span style="color:#e74c3c;">💀 输掉 $${mainPot}</span>`;
             voiceText += `${players[0].name} 胜出。`;
+            // AI输了大底池(>20BB)，触发上头
+            if (isP2AI && mainPot >= bbValue * 20) {
+                aiTiltLevel = Math.min(3, aiTiltLevel + 1);
+                updateAINameDisplay();
+            }
         } else if (s1.score > s0.score) { 
             players[1].stack += mainPot; 
-            res1 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`; 
-            res0 = `<span style="color:#e74c3c;">💀 输掉 $${mainPot}</span>`;
+            res1 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`; res0 = `<span style="color:#e74c3c;">💀 输掉 $${mainPot}</span>`;
             voiceText += `${players[1].name} 胜出。`;
+            // AI赢了，消气
+            if (isP2AI) { aiTiltLevel = Math.max(0, aiTiltLevel - 1); updateAINameDisplay(); }
         } else { 
-            let h = Math.floor(mainPot/2); 
-            let oddChip = mainPot % 2; 
+            let h = Math.floor(mainPot/2); let oddChip = mainPot % 2; 
             players[0].stack += h + oddChip; players[1].stack += h; 
-            res0 = `<span style="color:#3498db;">🤝 平分 $${h + oddChip}</span>`;
-            res1 = `<span style="color:#3498db;">🤝 平分 $${h}</span>`;
+            res0 = `<span style="color:#3498db;">🤝 平分 $${h + oddChip}</span>`; res1 = `<span style="color:#3498db;">🤝 平分 $${h}</span>`;
             voiceText += `双方平分底池。`;
         }
         
@@ -471,32 +538,19 @@
 
         document.getElementById('sd-report-0').innerHTML = `<div class="sd-report-title">${res0}</div>` + sharedGrid;
         document.getElementById('sd-report-1').innerHTML = `<div class="sd-report-title">${res1}</div>` + sharedGrid;
-        
-        document.getElementById('sd-report-0').style.display = 'flex';
-        document.getElementById('sd-report-1').style.display = 'flex';
+        document.getElementById('sd-report-0').style.display = 'flex'; document.getElementById('sd-report-1').style.display = 'flex';
         document.getElementById('btn-next-hand').style.display = 'block';
         
         speakText(voiceText); mainPot = 0; updateUI();
     }
     
-    // 核心更新 01：弃牌结算也做到双边非对称显示
     function endHand(winnerInfo, amount, loserInfo) { 
         isHandActive = false; mainPot = 0; updateUI(); 
-        let winHtml = `<div class="sd-report-title"><span style="color:#2ecc71;">🏆 赢取 $${amount}</span></div>
-                       <div style="color:#bdc3c7; font-size: 14px; margin-top:5px;">对手已弃牌</div>`;
-        let loseHtml = `<div class="sd-report-title"><span style="color:#e74c3c;">💀 输掉本局</span></div>
-                        <div style="color:#bdc3c7; font-size: 14px; margin-top:5px;">你已弃牌</div>`;
-
-        if (winnerInfo.id === 0) {
-            document.getElementById('sd-report-0').innerHTML = winHtml;
-            document.getElementById('sd-report-1').innerHTML = loseHtml;
-        } else {
-            document.getElementById('sd-report-0').innerHTML = loseHtml;
-            document.getElementById('sd-report-1').innerHTML = winHtml;
-        }
-
-        document.getElementById('sd-report-0').style.display = 'flex';
-        document.getElementById('sd-report-1').style.display = 'flex';
+        let winHtml = `<div class="sd-report-title"><span style="color:#2ecc71;">🏆 赢取 $${amount}</span></div><div style="color:#bdc3c7; font-size: 14px; margin-top:5px;">对手已弃牌</div>`;
+        let loseHtml = `<div class="sd-report-title"><span style="color:#e74c3c;">💀 输掉本局</span></div><div style="color:#bdc3c7; font-size: 14px; margin-top:5px;">你已弃牌</div>`;
+        if (winnerInfo.id === 0) { document.getElementById('sd-report-0').innerHTML = winHtml; document.getElementById('sd-report-1').innerHTML = loseHtml; } 
+        else { document.getElementById('sd-report-0').innerHTML = loseHtml; document.getElementById('sd-report-1').innerHTML = winHtml; }
+        document.getElementById('sd-report-0').style.display = 'flex'; document.getElementById('sd-report-1').style.display = 'flex';
         document.getElementById('btn-next-hand').style.display = 'block';
     }
 
@@ -504,49 +558,39 @@
         for(let i=0; i<2; i++){
             document.getElementById(`stack-${i}`).innerText = players[i].stack;
             document.getElementById(`dealer-${i}`).innerHTML = (btnIdx === i) ? `<span class="dealer-btn">D</span>` : "";
-            
             let chipDom = document.getElementById(`chip-${i}`);
-            if (players[i].bet > 0) { chipDom.style.display = 'flex'; chipDom.innerText = `$${players[i].bet}`; } 
-            else { chipDom.style.display = 'none'; }
+            if (players[i].bet > 0) { chipDom.style.display = 'flex'; chipDom.innerText = `$${players[i].bet}`; } else { chipDom.style.display = 'none'; }
         }
-
         let totalLivePot = mainPot + players[0].bet + players[1].bet;
-        document.getElementById('main-pot-0').innerText = `总底池: $${totalLivePot}`;
-        document.getElementById('main-pot-1').innerText = `总底池: $${totalLivePot}`;
+        document.getElementById('main-pot-0').innerText = `总底池: $${totalLivePot}`; document.getElementById('main-pot-1').innerText = `总底池: $${totalLivePot}`;
 
         let bDoms = document.getElementById('board-cards').children;
         for (let i = 0; i < 5; i++) {
-            if (i < board.length) {
-                bDoms[i].style.visibility = 'visible'; bDoms[i].className = 'card';
-                bDoms[i].innerHTML = getCardHTML(board[i]); bDoms[i].style.color = board[i].color;
-            }
+            if (i < board.length) { bDoms[i].style.visibility = 'visible'; bDoms[i].className = 'card'; bDoms[i].innerHTML = getCardHTML(board[i]); bDoms[i].style.color = board[i].color; }
         }
 
         document.getElementById('half-0').classList.toggle('active-half', toAct === 0 && isHandActive);
         document.getElementById('half-1').classList.toggle('active-half', toAct === 1 && isHandActive);
+        
         document.getElementById('console-0').style.display = (toAct === 0 && isHandActive) ? 'flex' : 'none';
-        document.getElementById('console-1').style.display = (toAct === 1 && isHandActive) ? 'flex' : 'none';
+        document.getElementById('console-1').style.display = (toAct === 1 && isHandActive && !isP2AI) ? 'flex' : 'none';
 
-        if (isHandActive) {
+        if (isHandActive && toAct === 0) {
             let me = players[toAct]; let callCost = highestBet - me.bet;
             let btnCall = document.getElementById(`btn-call-${toAct}`);
             if (callCost === 0) btnCall.innerText = "看牌 (Check)";
             else if (callCost >= me.stack) btnCall.innerText = "全押跟注 (Call All-in)";
             else btnCall.innerText = `跟注 $${callCost} (Call)`;
 
-            let minTarget = highestBet + minRaiseInc;
-            let maxTarget = me.bet + me.stack;
+            let minTarget = highestBet + minRaiseInc; let maxTarget = me.bet + me.stack;
             if (minTarget > maxTarget) minTarget = maxTarget; 
             
             let slider = document.getElementById(`slider-${toAct}`);
             slider.min = minTarget; slider.max = maxTarget; slider.step = bbValue;
             
             let disableRaise = (me.stack <= callCost);
-            slider.disabled = disableRaise;
-            document.getElementById(`btn-confirm-${toAct}`).disabled = disableRaise;
-            
-            if(!disableRaise){ slider.value = minTarget; updatePendingRaise(minTarget, toAct); } 
-            else { updatePendingRaise(0, toAct); }
+            slider.disabled = disableRaise; document.getElementById(`btn-confirm-${toAct}`).disabled = disableRaise;
+            if(!disableRaise){ slider.value = minTarget; updatePendingRaise(minTarget, toAct); } else { updatePendingRaise(0, toAct); }
         }
     }
 
@@ -570,17 +614,111 @@
         let map = {}; ranks.forEach(r => map[r] = (map[r] || 0) + 1);
         let arr = Object.keys(map).map(r => ({ r: parseInt(r), c: map[r] })).sort((a, b) => b.c - a.c || b.r - a.r);
         let type = 0, ord = arr.map(f => f.r);
-
         if (isFlush && isStraight) type = 8; else if (arr[0].c === 4) type = 7;
         else if (arr[0].c === 3 && arr[1].c === 2) type = 6; else if (isFlush) type = 5;
         else if (isStraight) type = 4; else if (arr[0].c === 3) type = 3;
         else if (arr[0].c === 2 && arr[1].c === 2) type = 2; else if (arr[0].c === 2) type = 1;
-
         let score = type << 20;
         if (type===8||type===4) score |= (stHigh << 16);
         else if (type===5||type===0) score |= (ranks[0]<<16)|(ranks[1]<<12)|(ranks[2]<<8)|(ranks[3]<<4)|ranks[4];
         else { score |= (ord[0]<<16); if(ord[1]) score|=(ord[1]<<12); if(ord[2]) score|=(ord[2]<<8); if(ord[3]) score|=(ord[3]<<4); if(ord[4]) score|=ord[4]; }
         return {score: score, name: HAND_NAMES[type]};
+    }
+
+    // --- V7 终极 AI 核心引擎 (统一蒙特卡洛 + 范围惩罚 + 上头修正) ---
+
+    // 始终使用蒙特卡洛计算绝对胜率
+    function calculateEquityMonteCarlo(aiCards, boardCards, iterations = 250) {
+        let knownCards = [...aiCards, ...boardCards];
+        let remainingDeck = [];
+        SUITS.forEach(s => {
+            RANKS.forEach(r => {
+                let isKnown = knownCards.some(c => c.val === r.val && c.sign === s.sign);
+                if (!isKnown) remainingDeck.push({ val: r.val, l: r.l, sign: s.sign, color: s.color });
+            });
+        });
+        let wins = 0, ties = 0;
+        for (let i = 0; i < iterations; i++) {
+            let tempDeck = [...remainingDeck];
+            for (let j = tempDeck.length - 1; j > 0; j--) {
+                const k = Math.floor(Math.random() * (j + 1));
+                [tempDeck[j], tempDeck[k]] = [tempDeck[k], tempDeck[j]];
+            }
+            let oppCards = [tempDeck.pop(), tempDeck.pop()];
+            let simBoard = [...boardCards];
+            while (simBoard.length < 5) simBoard.push(tempDeck.pop());
+            let aiScore = getBest5(aiCards.concat(simBoard)).score;
+            let oppScore = getBest5(oppCards.concat(simBoard)).score;
+            if (aiScore > oppScore) wins++; else if (aiScore === oppScore) ties++;
+        }
+        return (wins + ties * 0.5) / iterations;
+    }
+
+    function processAITurn() {
+        if (!isHandActive || toAct !== 1) return;
+        let ai = players[1]; 
+        let callCost = highestBet - ai.bet;
+        let potTotal = mainPot + players[0].bet + players[1].bet;
+        
+        // 动态应用上头情绪：修改 VPIP, 激进指数, 和诈唬率
+        let currentVPIP = Math.min(1.0, aiPersonality.vpip + (aiTiltLevel * 0.15));
+        let currentAggr = Math.min(1.0, aiPersonality.aggr + (aiTiltLevel * 0.20));
+        let currentBluff = Math.min(1.0, aiPersonality.bluffRate + (aiTiltLevel * 0.20));
+
+        // 统一获取绝对胜率
+        let handStrength = calculateEquityMonteCarlo(ai.cards, board, 250);
+        
+        // 核心数学修正：对手范围惩罚 (Range Penalty)
+        // 玩家下注越多，说明他的牌非随机，AI必须扣除自己的预估胜率避其锋芒
+        if (callCost > 0) {
+            let callBBs = callCost / bbValue;
+            let penalty = (callBBs * 0.015); // 每跟注1个大盲，胜率扣除1.5%
+            handStrength -= penalty;
+        }
+
+        let potOdds = callCost > 0 ? callCost / (potTotal + callCost) : 0;
+        let randomFactor = Math.random(); 
+        let act = 'fold';
+
+        // 翻前烂牌过滤
+        if (street === 0 && handStrength < 0.35 && randomFactor > currentVPIP && callCost > 0) {
+            act = 'fold';
+        } else {
+            // 核心决策树
+            if (callCost === 0) {
+                if (handStrength > 0.6 && randomFactor < currentAggr) act = 'raise';
+                else if (randomFactor < currentBluff * 0.5) act = 'raise'; 
+                else act = 'call'; 
+            } else {
+                if (handStrength >= potOdds) {
+                    if (randomFactor < currentAggr && handStrength > 0.65) act = 'raise';
+                    else act = 'call';
+                } else {
+                    if (randomFactor < currentBluff) act = 'raise'; 
+                    else if (randomFactor < (currentVPIP * 0.5)) act = 'call'; 
+                    else act = 'fold';
+                }
+            }
+        }
+
+        // 职业下注尺度 (Bet Sizing) 替代原来的随机乱下注
+        if (act === 'raise') {
+            let minTarget = highestBet + minRaiseInc;
+            // 职业选手常用尺度：半池，2/3池，满池，超池
+            let sizingOptions = [0.5, 0.66, 1.0, 1.5];
+            
+            // 上头时更容易下超池重注
+            let sizeIdx = Math.floor(Math.random() * (aiTiltLevel > 0 ? 4 : 3)); 
+            if (handStrength > 0.85) sizeIdx = 2; // 极强牌稳定下满池
+            
+            let bonusBet = Math.floor(potTotal * sizingOptions[sizeIdx]);
+            bonusBet = bonusBet - (bonusBet % bbValue); // 规整筹码
+            
+            pendingRaiseAmount = minTarget + bonusBet;
+            if (pendingRaiseAmount > ai.stack + ai.bet) pendingRaiseAmount = ai.stack + ai.bet; // All-in limit
+        }
+
+        handleAction(act);
     }
 </script>
 
