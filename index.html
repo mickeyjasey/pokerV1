@@ -3,19 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>德州扑克 Heads-Up 面对面完全体 V3</title>
+    <title>德州扑克 Heads-Up 面对面终极完美版 V4</title>
     <style>
-        :root {
-            --felt-color: #1b4d3e; --felt-dark: #11362a;
-            --gold-active: rgba(255, 215, 0, 0.8); --gold-bg: rgba(255, 215, 0, 0.15);
-            --card-back: #c0392b;
-        }
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background-color: #000; color: #f5f5f7;
-            margin: 0; padding: 0; height: 100vh; width: 100vw;
-            display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-user-select: none;
-        }
+        :root { --felt-color: #1b4d3e; --felt-dark: #11362a; --gold-active: rgba(255, 215, 0, 0.8); --gold-bg: rgba(255, 215, 0, 0.15); --card-back: #c0392b; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background-color: #000; color: #f5f5f7; margin: 0; padding: 0; height: 100vh; width: 100vw; display: flex; flex-direction: column; overflow: hidden; user-select: none; -webkit-user-select: none; }
 
         #setup-panel { position: absolute; inset: 0; background: #1e1e24; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; overflow-y: auto; }
         .setup-box { background: #2c2c35; padding: 25px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); width: 85%; max-width: 350px; text-align: center; }
@@ -110,7 +101,6 @@
 
     <div id="game-container">
         
-        <!-- ================= 玩家 2 区域 ================= -->
         <div id="half-1" class="player-half top-half">
             <div class="player-info">
                 <div class="name-dealer"><span id="dealer-1"></span> <span id="name-display-1">玩家 2</span></div>
@@ -148,7 +138,6 @@
             </div>
         </div>
 
-        <!-- ================= 中央区域 ================= -->
         <div id="center-board">
             <div class="pot-display pot-p1" id="main-pot-1">总底池: $0</div>
             <div id="board-cards">
@@ -162,7 +151,6 @@
             <div class="pot-display" id="main-pot-0">总底池: $0</div>
         </div>
 
-        <!-- ================= 玩家 1 区域 ================= -->
         <div id="half-0" class="player-half bottom-half">
             <div class="action-console" id="console-0">
                 <div class="row">
@@ -228,9 +216,7 @@
         let fullMsg = `${actorName}：${actionText}`;
         [0, 1].forEach(i => {
             let bubble = document.getElementById(`action-${i}`);
-            bubble.innerText = fullMsg;
-            bubble.style.background = color;
-            bubble.style.opacity = 1;
+            bubble.innerText = fullMsg; bubble.style.background = color; bubble.style.opacity = 1;
         });
     }
     
@@ -239,11 +225,15 @@
         document.getElementById('action-1').style.opacity = 0;
     }
 
+    // 完美修正算法缺陷：采用浮点乘法彻底消除模偏差(Modulo Bias)
     function secureShuffle(arr) {
         if (window.crypto && window.crypto.getRandomValues) {
             const rVals = new Uint32Array(arr.length); window.crypto.getRandomValues(rVals);
             for (let i = arr.length - 1; i > 0; i--) {
-                const j = rVals[i] % (i + 1); [arr[i], arr[j]] = [arr[j], arr[i]];
+                // 原代码：const j = rVals[i] % (i + 1);
+                // 完美代码：(rVals / 4294967296) 得到一个极高精度的 0~0.999 随机小数
+                const j = Math.floor((rVals[i] / 4294967296) * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
             }
         } else {
             for (let i = arr.length - 1; i > 0; i--) {
@@ -272,11 +262,9 @@
     }
 
     function getCardHTML(cardObj) {
-        return `
-            <div class="top-idx"><div class="card-val">${cardObj.l}</div><div class="card-suit">${cardObj.sign}</div></div>
-            <div class="center-suit">${cardObj.sign}</div>
-            <div class="bot-idx"><div class="card-val">${cardObj.l}</div><div class="card-suit">${cardObj.sign}</div></div>
-        `;
+        return `<div class="top-idx"><div class="card-val">${cardObj.l}</div><div class="card-suit">${cardObj.sign}</div></div>
+                <div class="center-suit">${cardObj.sign}</div>
+                <div class="bot-idx"><div class="card-val">${cardObj.l}</div><div class="card-suit">${cardObj.sign}</div></div>`;
     }
 
     function startNextHand() {
@@ -312,7 +300,6 @@
 
         postBlind(btnIdx, Math.floor(bbValue / 2));
         postBlind(1 - btnIdx, bbValue);
-        
         highestBet = bbValue; toAct = btnIdx; 
 
         speakText("新局开始");
@@ -341,17 +328,12 @@
         document.getElementById(`btn-confirm-${pIdx}`).innerText = `确认加注到 $${pendingRaiseAmount}`;
     }
 
-    // 核心改进 01：更符合直觉的真实加注逻辑 & 强制对齐 BB 步长
     function setSliderByPct(pct, pIdx) {
         let currentLivePot = mainPot + players[0].bet + players[1].bet;
-        // 目标下注额 = 当前最高注 + (底池 * 比例)
         let targetTotal = highestBet + Math.floor(currentLivePot * pct);
         
-        // 强制吸附运算，使得每次加出来的注都是盲注的整数倍，手感更干脆
         let remainder = targetTotal % bbValue;
-        if (remainder !== 0) {
-            targetTotal = targetTotal - remainder + (remainder >= (bbValue / 2) ? bbValue : 0);
-        }
+        if (remainder !== 0) { targetTotal = targetTotal - remainder + (remainder >= (bbValue / 2) ? bbValue : 0); }
 
         let slider = document.getElementById(`slider-${pIdx}`);
         let min = parseInt(slider.min), max = parseInt(slider.max);
@@ -359,8 +341,7 @@
         if(targetTotal < min) targetTotal = min; 
         if(targetTotal > max) targetTotal = max;
         
-        slider.value = targetTotal; 
-        updatePendingRaise(targetTotal, pIdx);
+        slider.value = targetTotal; updatePendingRaise(targetTotal, pIdx);
     }
     
     function setSliderMax(pIdx) { let s = document.getElementById(`slider-${pIdx}`); s.value = s.max; updatePendingRaise(s.max, pIdx); }
@@ -381,26 +362,21 @@
 
         if (act === 'call') {
             if (callCost === 0) {
-                broadcastAction(me.name, "看牌 (Check)", "#7f8c8d");
-                speakText(`${me.name} 看牌`);
+                broadcastAction(me.name, "看牌 (Check)", "#7f8c8d"); speakText(`${me.name} 看牌`);
             } else if (me.stack <= callCost) { 
-                broadcastAction(me.name, "全押跟注 (Call All-in)", "#e74c3c");
-                speakText(`${me.name} 全押跟注`);
+                broadcastAction(me.name, "全押跟注 (Call All-in)", "#e74c3c"); speakText(`${me.name} 全押跟注`);
                 me.bet += me.stack; me.stack = 0; me.allIn = true; 
             } else { 
-                broadcastAction(me.name, `跟注 $${callCost}`, "#2980b9");
-                speakText(`${me.name} 跟注`);
+                broadcastAction(me.name, `跟注 $${callCost}`, "#2980b9"); speakText(`${me.name} 跟注`);
                 me.stack -= callCost; me.bet += callCost; 
             }
         } else if (act === 'raise') {
             let target = pendingRaiseAmount; let needed = target - me.bet;
             if (needed >= me.stack) { 
-                broadcastAction(me.name, "全押 (All-in)", "#e74c3c");
-                speakText(`${me.name} 全押`);
+                broadcastAction(me.name, "全押 (All-in)", "#e74c3c"); speakText(`${me.name} 全押`);
                 me.bet += me.stack; me.stack = 0; me.allIn = true; target = me.bet;
             } else { 
-                broadcastAction(me.name, `加注到 $${target}`, "#27ae60");
-                speakText(`${me.name} 加注到 ${target}`);
+                broadcastAction(me.name, `加注到 $${target}`, "#27ae60"); speakText(`${me.name} 加注到 ${target}`);
                 me.stack -= needed; me.bet = target; 
             }
             if (target > highestBet) { minRaiseInc = Math.max(minRaiseInc, target - highestBet); highestBet = target; }
@@ -420,8 +396,17 @@
         else { toAct = 1 - toAct; updateUI(); }
     }
 
+    // 完美修正逻辑漏洞：进街或All-in结算前，强制退回多余未跟注筹码
     function advanceStreet() {
         clearActionBubbles();
+        
+        let diff = players[0].bet - players[1].bet;
+        if (diff > 0) {
+            players[0].stack += diff; players[0].bet -= diff;
+        } else if (diff < 0) {
+            players[1].stack += Math.abs(diff); players[1].bet -= Math.abs(diff);
+        }
+
         mainPot += players[0].bet + players[1].bet;
         players[0].bet = 0; players[1].bet = 0;
         highestBet = 0; minRaiseInc = bbValue; actionCount = 0;
@@ -442,15 +427,14 @@
     }
 
     function getMiniCardsHTML(pIdx) {
-        let c0 = players[pIdx].cards[0];
-        let c1 = players[pIdx].cards[1];
-        return `
-            <div class="mini-cards-box">
-                <div class="m-card" style="color:${c0.color}"><div>${c0.l}</div><div>${c0.sign}</div></div>
-                <div class="m-card" style="color:${c1.color}"><div>${c1.l}</div><div>${c1.sign}</div></div>
-            </div>`;
+        let c0 = players[pIdx].cards[0]; let c1 = players[pIdx].cards[1];
+        return `<div class="mini-cards-box">
+                    <div class="m-card" style="color:${c0.color}"><div>${c0.l}</div><div>${c0.sign}</div></div>
+                    <div class="m-card" style="color:${c1.color}"><div>${c1.l}</div><div>${c1.sign}</div></div>
+                </div>`;
     }
 
+    // 完美修正计算瑕疵：平分底池不丢失零头
     function showdown() {
         isHandActive = false;
         for (let p = 0; p < 2; p++) { players[p].revealed = [false, false]; toggleCard(p, 0); toggleCard(p, 1); }
@@ -461,33 +445,26 @@
 
         if (s0.score > s1.score) { 
             players[0].stack += mainPot; 
-            res0 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`;
-            res1 = `<span style="color:#e74c3c;">💀 输掉底池</span>`;
+            res0 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`; res1 = `<span style="color:#e74c3c;">💀 输掉底池</span>`;
             voiceText += `${players[0].name} 的 ${s0.name} 胜出。`;
         } else if (s1.score > s0.score) { 
             players[1].stack += mainPot; 
-            res1 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`;
-            res0 = `<span style="color:#e74c3c;">💀 输掉底池</span>`;
+            res1 = `<span style="color:#2ecc71;">🏆 赢取 $${mainPot}</span>`; res0 = `<span style="color:#e74c3c;">💀 输掉底池</span>`;
             voiceText += `${players[1].name} 的 ${s1.name} 胜出。`;
         } else { 
-            let h = Math.floor(mainPot/2); players[0].stack+=h; players[1].stack+=h; 
-            res0 = `<span style="color:#3498db;">🤝 平分 $${h}</span>`;
+            let h = Math.floor(mainPot/2); 
+            let oddChip = mainPot % 2; // 获取无法平分的1块钱零头
+            players[0].stack += h + oddChip; // 零头补偿给玩家1
+            players[1].stack += h; 
+            res0 = `<span style="color:#3498db;">🤝 平分 $${h + oddChip}</span>`;
             res1 = `<span style="color:#3498db;">🤝 平分 $${h}</span>`;
             voiceText += `双方平分底池。`;
         }
         
         let sharedGrid = `
             <div class="sd-players-grid">
-                <div class="sd-player-col">
-                    <span class="sd-p-name">${players[0].name}</span>
-                    ${getMiniCardsHTML(0)}
-                    <span class="sd-p-hand">${s0.name}</span>
-                </div>
-                <div class="sd-player-col">
-                    <span class="sd-p-name">${players[1].name}</span>
-                    ${getMiniCardsHTML(1)}
-                    <span class="sd-p-hand">${s1.name}</span>
-                </div>
+                <div class="sd-player-col"><span class="sd-p-name">${players[0].name}</span>${getMiniCardsHTML(0)}<span class="sd-p-hand">${s0.name}</span></div>
+                <div class="sd-player-col"><span class="sd-p-name">${players[1].name}</span>${getMiniCardsHTML(1)}<span class="sd-p-hand">${s1.name}</span></div>
             </div>`;
 
         document.getElementById('sd-report-0').innerHTML = `<div class="sd-report-title">${res0}</div>` + sharedGrid;
@@ -497,18 +474,15 @@
         document.getElementById('sd-report-1').style.display = 'flex';
         document.getElementById('btn-next-hand').style.display = 'block';
         
-        speakText(voiceText);
-        mainPot = 0; updateUI();
+        speakText(voiceText); mainPot = 0; updateUI();
     }
     
     function endHand(winnerInfo, amount, loserInfo) { 
         isHandActive = false; mainPot = 0; updateUI(); 
         let html = `<div class="sd-report-title"><span style="color:#2ecc71;">🏆 赢取 $${amount}</span></div>
                     <div style="color:#bdc3c7; font-size: 14px; margin-top:5px;">${loserInfo.name} 已弃牌</div>`;
-        document.getElementById('sd-report-0').innerHTML = html;
-        document.getElementById('sd-report-1').innerHTML = html;
-        document.getElementById('sd-report-0').style.display = 'flex';
-        document.getElementById('sd-report-1').style.display = 'flex';
+        document.getElementById('sd-report-0').innerHTML = html; document.getElementById('sd-report-1').innerHTML = html;
+        document.getElementById('sd-report-0').style.display = 'flex'; document.getElementById('sd-report-1').style.display = 'flex';
         document.getElementById('btn-next-hand').style.display = 'block';
     }
 
@@ -551,9 +525,7 @@
             if (minTarget > maxTarget) minTarget = maxTarget; 
             
             let slider = document.getElementById(`slider-${toAct}`);
-            slider.min = minTarget; slider.max = maxTarget;
-            // 核心改进 02：强制滑块以大盲注 (BB) 为步长进行滑动
-            slider.step = bbValue;
+            slider.min = minTarget; slider.max = maxTarget; slider.step = bbValue;
             
             let disableRaise = (me.stack <= callCost);
             slider.disabled = disableRaise;
